@@ -57,7 +57,7 @@ Para usar este provider necesitas crear una aplicación OAuth 2.0 en Atlassian y
 1. En el menú lateral, selecciona **"Authorization"**
 2. Haz clic en **"Configure"** junto a **"OAuth 2.0 (3LO)"**
 3. Ingresa tu **Callback URL** (debe coincidir con el `redirect_uri` que uses en las llamadas)
-   - Ejemplo: `https://mi-app.com/callback` o `http://localhost:8080/callback`
+   - Para este provider debería ser: http://localhost:1215/callback/atlassian
 4. Guarda la configuración
 
 ### 4. Configurar Permisos (Scopes)
@@ -127,7 +127,7 @@ echo '{
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira write:jira offline_access"},
     {"name": "state", "value": "session-001"}
   ]
@@ -161,7 +161,7 @@ echo '{
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira offline_access"},
     {"name": "state", "value": "session-001"},
     {"name": "code_challenge", "value": "HASH_S256_DE_TU_CODE_VERIFIER"},
@@ -184,7 +184,7 @@ echo '{
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "client_secret", "value": "TU_CLIENT_SECRET"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"}
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"}
   ]
 }' | grant-atlassian oauth2 get-token
 
@@ -196,7 +196,7 @@ echo '{
   "arguments": [
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "TU_CODE_VERIFIER_ORIGINAL"}
   ]
 }' | grant-atlassian oauth2 get-token
@@ -238,7 +238,7 @@ INPUT_JSON=$(cat <<EOF
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira offline_access"},
     {"name": "state", "value": "state-$(date +%s)"},
     {"name": "code_challenge", "value": "$CODE_CHALLENGE"},
@@ -257,7 +257,7 @@ echo "$INPUT_JSON" | grant-atlassian oauth2 get-url
 Extrae la `authorization_url` de la respuesta JSON y redirige al usuario. Después de autorizar, Atlassian redirige a:
 
 ```
-http://127.0.0.1:1215/callback/atlassian?code=AUTH_CODE&state=state-...
+http://localhost:1215/callback/atlassian?code=AUTH_CODE&state=state-...
 ```
 
 ### 3. Intercambiar código por token
@@ -272,7 +272,7 @@ INPUT_JSON=$(cat <<EOF
   "arguments": [
     {"name": "code", "value": "AUTH_CODE_RECIBIDO"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "$CODE_VERIFIER"}
   ]
 }
