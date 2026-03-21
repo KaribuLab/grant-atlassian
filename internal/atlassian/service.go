@@ -184,10 +184,10 @@ func (s *Service) ExchangeCodeForToken(ctx context.Context, req TokenRequest) (*
 	}
 
 	payload := map[string]string{
-		"grant_type":    "authorization_code",
-		"code":          req.Code,
-		"client_id":     req.ClientID,
-		"redirect_uri":  req.RedirectURI,
+		"grant_type":   "authorization_code",
+		"code":         req.Code,
+		"client_id":    req.ClientID,
+		"redirect_uri": req.RedirectURI,
 	}
 
 	if req.ClientSecret != "" {
