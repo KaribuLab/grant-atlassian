@@ -128,7 +128,7 @@ echo '{
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira write:jira offline_access"},
+    {"name": "scope", "value": "read:jira write:jira-work"},
     {"name": "state", "value": "session-001"}
   ]
 }' | grant-atlassian oauth2 get-url
@@ -162,7 +162,7 @@ echo '{
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira offline_access"},
+    {"name": "scope", "value": "read:jira write:jira-work"},
     {"name": "state", "value": "session-001"},
     {"name": "code_challenge", "value": "HASH_S256_DE_TU_CODE_VERIFIER"},
     {"name": "code_challenge_method", "value": "S256"}
@@ -239,7 +239,7 @@ INPUT_JSON=$(cat <<EOF
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira offline_access"},
+    {"name": "scope", "value": "read:jira write:jira-work"},
     {"name": "state", "value": "state-$(date +%s)"},
     {"name": "code_challenge", "value": "$CODE_CHALLENGE"},
     {"name": "code_challenge_method", "value": "S256"}
