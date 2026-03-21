@@ -33,6 +33,70 @@ task build
 
 - Go 1.25 o superior
 - [Task](https://taskfile.dev/installation/) (opcional, para usar Taskfile.yaml)
+- Una aplicación OAuth 2.0 creada en la [Consola de Desarrolladores de Atlassian](https://developer.atlassian.com/console/myapps/)
+
+## Obtener client_id y client_secret
+
+Para usar este provider necesitas crear una aplicación OAuth 2.0 en Atlassian y obtener tus credenciales. Sigue estos pasos:
+
+### 1. Acceder a la Consola de Desarrolladores
+
+1. Ve a [developer.atlassian.com](https://developer.atlassian.com)
+2. Haz clic en tu icono de perfil (esquina superior derecha)
+3. Selecciona **"Developer console"** del menú desplegable
+
+### 2. Crear una nueva aplicación
+
+1. En la Consola de Desarrolladores, haz clic en **"Create"** o **"Crear"**
+2. Selecciona **"OAuth 2.0 integration"** (Integración OAuth 2.0)
+3. Ingresa un nombre para tu aplicación (ej: "Mi Integración Atlassian")
+4. Haz clic en **"Create"** para crear la aplicación
+
+### 3. Configurar OAuth 2.0 (3LO)
+
+1. En el menú lateral, selecciona **"Authorization"**
+2. Haz clic en **"Configure"** junto a **"OAuth 2.0 (3LO)"**
+3. Ingresa tu **Callback URL** (debe coincidir con el `redirect_uri` que uses en las llamadas)
+   - Ejemplo: `https://mi-app.com/callback` o `http://localhost:8080/callback`
+4. Guarda la configuración
+
+### 4. Configurar Permisos (Scopes)
+
+1. En el menú lateral, selecciona **"Permissions"**
+2. Agrega las APIs que necesites:
+   - **Jira Cloud**: Para acceder a Jira
+   - **Confluence Cloud**: Para acceder a Confluence
+3. Configura los scopes necesarios:
+   - `read:jira` - Leer datos de Jira
+   - `write:jira` - Escribir datos de Jira
+   - `offline_access` - Para obtener refresh tokens
+4. Haz clic en **"Save changes"**
+
+### 5. Obtener tus Credenciales
+
+1. En el menú lateral, selecciona **"Settings"**
+2. Aquí encontrarás:
+   - **Client ID**: El identificador de tu aplicación (se usa en `client_id`)
+   - **Secret**: El secreto de tu aplicación (se usa en `client_secret`)
+
+```bash
+# Ejemplo de credenciales
+client_id: "abc123def456ghi789"
+client_secret: "s3cr3t_k3y_xyz789"
+```
+
+**Nota importante**: El `client_secret` solo se muestra una vez al crear la aplicación. Si lo pierdes, deberás generar uno nuevo en la sección Settings.
+
+### Distribución de la App (Opcional)
+
+Si deseas que otros usuarios puedan usar tu aplicación:
+
+1. Ve a **"Distribution"** en el menú lateral
+2. Completa la información requerida (descripción, política de privacidad, etc.)
+3. Cambia el estado a **"Sharing"**
+4. Atlassian revisará tu aplicación antes de aprobarla
+
+Para uso interno o desarrollo, puedes dejarla en modo **"Not sharing"**.
 
 ## Uso
 
@@ -63,9 +127,9 @@ echo '{
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"},
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira write:jira offline_access"},
-    {"name": "state", "value": "random-state-123"}
+    {"name": "state", "value": "session-001"}
   ]
 }' | grant-atlassian oauth2 get-url
 ```
@@ -97,9 +161,9 @@ echo '{
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"},
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira offline_access"},
-    {"name": "state", "value": "random-state-123"},
+    {"name": "state", "value": "session-001"},
     {"name": "code_challenge", "value": "HASH_S256_DE_TU_CODE_VERIFIER"},
     {"name": "code_challenge_method", "value": "S256"}
   ]
@@ -120,7 +184,7 @@ echo '{
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "client_secret", "value": "TU_CLIENT_SECRET"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"}
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"}
   ]
 }' | grant-atlassian oauth2 get-token
 
@@ -132,7 +196,7 @@ echo '{
   "arguments": [
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"},
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "TU_CODE_VERIFIER_ORIGINAL"}
   ]
 }' | grant-atlassian oauth2 get-token
@@ -174,7 +238,7 @@ INPUT_JSON=$(cat <<EOF
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"},
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira offline_access"},
     {"name": "state", "value": "state-$(date +%s)"},
     {"name": "code_challenge", "value": "$CODE_CHALLENGE"},
@@ -193,7 +257,7 @@ echo "$INPUT_JSON" | grant-atlassian oauth2 get-url
 Extrae la `authorization_url` de la respuesta JSON y redirige al usuario. Después de autorizar, Atlassian redirige a:
 
 ```
-https://tu-app.com/callback?code=AUTH_CODE&state=state-...
+http://127.0.0.1:1215/callback/atlassian?code=AUTH_CODE&state=state-...
 ```
 
 ### 3. Intercambiar código por token
@@ -208,7 +272,7 @@ INPUT_JSON=$(cat <<EOF
   "arguments": [
     {"name": "code", "value": "AUTH_CODE_RECIBIDO"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "https://tu-app.com/callback"},
+    {"name": "redirect_uri", "value": "http://127.0.0.1:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "$CODE_VERIFIER"}
   ]
 }
@@ -321,9 +385,17 @@ go test ./internal/handler/... -v
 
 ## Documentación oficial
 
-- [Implementing OAuth 2.0 (3LO)](https://developer.atlassian.com/cloud/oauth/getting-started/implementing-oauth-3lo/)
-- [OAuth 2.0 scopes](https://developer.atlassian.com/cloud/oauth/scopes/)
-- [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
+### Guías de Atlassian
+
+- [Implementing OAuth 2.0 (3LO)](https://developer.atlassian.com/cloud/oauth/getting-started/implementing-oauth-3lo/) - Guía completa del flujo de autorización
+- [Managing your OAuth 2.0 apps](https://developer.atlassian.com/cloud/oauth/getting-started/managing-oauth-apps/) - Cómo gestionar tus aplicaciones OAuth
+- [Enabling OAuth 2.0 3LO](https://developer.atlassian.com/cloud/oauth/getting-started/enabling-oauth-3lo/) - Habilitar OAuth 2.0 en tu app
+- [OAuth 2.0 scopes](https://developer.atlassian.com/cloud/oauth/scopes/) - Lista completa de scopes disponibles
+
+### Consola y Credenciales
+
+- [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) - Crear y gestionar aplicaciones
+- [Create OAuth 2.0 credential](https://support.atlassian.com/user-management/docs/create-oauth-2-0-credential-for-service-accounts/) - Crear credenciales OAuth 2.0
 
 ## Licencia
 
