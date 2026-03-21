@@ -68,8 +68,8 @@ Para usar este provider necesitas crear una aplicación OAuth 2.0 en Atlassian y
    - **Confluence Cloud**: Para acceder a Confluence
 3. Configura los scopes necesarios:
    - `read:jira` - Leer datos de Jira
-   - `write:jira` - Escribir datos de Jira
-   - `offline_access` - Para obtener refresh tokens
+   - `write:jira-work` - Escribir datos de Jira
+   - `offline_access` - Para obtener refresh token
 4. Haz clic en **"Save changes"**
 
 ### 5. Obtener tus Credenciales
@@ -87,16 +87,27 @@ client_secret: "s3cr3t_k3y_xyz789"
 
 **Nota importante**: El `client_secret` solo se muestra una vez al crear la aplicación. Si lo pierdes, deberás generar uno nuevo en la sección Settings.
 
-### Distribución de la App (Opcional)
+### 6. Habilitar Sharing antes de probar
 
-Si deseas que otros usuarios puedan usar tu aplicación:
+Al intentar autorizar la app por primera vez, Atlassian muestra el siguiente error:
 
-1. Ve a **"Distribution"** en el menú lateral
-2. Completa la información requerida (descripción, política de privacidad, etc.)
-3. Cambia el estado a **"Sharing"**
-4. Atlassian revisará tu aplicación antes de aprobarla
+> **"You don't have access to this app. This application is in development — only the owner of this application may grant it access to their account."**
 
-Para uso interno o desarrollo, puedes dejarla en modo **"Not sharing"**.
+Esto ocurre porque las apps OAuth 2.0 recién creadas están en modo **desarrollo restringido**: solo el usuario propietario puede autorizarlas. Para poder probar el flujo completo, incluso como desarrollador, debes habilitar el modo **Sharing**:
+
+1. En la Consola de Desarrolladores, selecciona tu app
+2. En el menú lateral, selecciona **"Distribution"**
+3. Activa el toggle **"Enable sharing"**
+4. Guarda los cambios
+
+Una vez habilitado el sharing, los usuarios verán un aviso de que la app aún no ha sido revisada por Atlassian. Acepta el aviso para continuar con el flujo de autorización.
+
+> **Nota**: Las apps OAuth 2.0 (3LO) se autorizan **por usuario**. Cada usuario que quiera usar la app debe pasar por el flujo de autorización individualmente.
+
+Para distribución amplia o producción:
+
+1. Completa la información requerida en **"Distribution"** (descripción, política de privacidad, etc.)
+2. Solicita la revisión de Atlassian para publicar en el Marketplace (opcional)
 
 ## Uso
 
@@ -128,10 +139,10 @@ echo '{
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira write:jira-work"},
+    {"name": "scope", "value": "read:jira-work read:jira-user offline_access"},
     {"name": "state", "value": "session-001"}
   ]
-}' | grant-atlassian oauth2 get-url
+}' | grant-atlassian get-url
 ```
 
 Salida JSON:
@@ -162,12 +173,12 @@ echo '{
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira write:jira-work"},
+    {"name": "scope", "value": "read:jira-work read:jira-user offline_access"},
     {"name": "state", "value": "session-001"},
     {"name": "code_challenge", "value": "HASH_S256_DE_TU_CODE_VERIFIER"},
     {"name": "code_challenge_method", "value": "S256"}
   ]
-}' | grant-atlassian oauth2 get-url
+}' | grant-atlassian get-url
 ```
 
 ### Comando get-token
@@ -186,7 +197,7 @@ echo '{
     {"name": "client_secret", "value": "TU_CLIENT_SECRET"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"}
   ]
-}' | grant-atlassian oauth2 get-token
+}' | grant-atlassian get-token
 
 # Para aplicaciones públicas (con PKCE)
 echo '{
@@ -199,7 +210,7 @@ echo '{
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "TU_CODE_VERIFIER_ORIGINAL"}
   ]
-}' | grant-atlassian oauth2 get-token
+}' | grant-atlassian get-token
 ```
 
 Salida JSON:
@@ -215,7 +226,7 @@ Salida JSON:
     "refresh_token": "eyJ...",
     "expires_in": 3600,
     "token_type": "Bearer",
-    "scope": "read:jira write:jira"
+    "scope": "read:jira-work read:jira-user offline_access"
   }
 }
 ```
@@ -239,7 +250,7 @@ INPUT_JSON=$(cat <<EOF
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "scope", "value": "read:jira write:jira-work"},
+    {"name": "scope", "value": "read:jira-work read:jira-user offline_access"},
     {"name": "state", "value": "state-$(date +%s)"},
     {"name": "code_challenge", "value": "$CODE_CHALLENGE"},
     {"name": "code_challenge_method", "value": "S256"}
@@ -249,7 +260,7 @@ EOF
 )
 
 # Ejecutar comando
-echo "$INPUT_JSON" | grant-atlassian oauth2 get-url
+echo "$INPUT_JSON" | grant-atlassian get-url
 ```
 
 ### 2. Redirigir al usuario
@@ -280,7 +291,7 @@ EOF
 )
 
 # Ejecutar comando
-echo "$INPUT_JSON" | grant-atlassian oauth2 get-token
+echo "$INPUT_JSON" | grant-atlassian get-token
 ```
 
 ## Argumentos
@@ -311,7 +322,7 @@ echo "$INPUT_JSON" | grant-atlassian oauth2 get-token
 
 Atlassian ofrece varios scopes dependiendo del producto:
 
-- **Jira**: `read:jira`, `write:jira`, `read:jira-work`, `write:jira-work`, `read:jira-user`, `offline_access`
+- **Jira**: `read:jira-work`, `write:jira-work`, `read:jira-user`, `offline_access`
 - **Confluence**: `read:confluence`, `write:confluence`, `read:confluence-space.summary`, `offline_access`
 
 Para más información: [OAuth 2.0 scopes](https://developer.atlassian.com/cloud/oauth/scopes/)
