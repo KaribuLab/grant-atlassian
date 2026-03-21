@@ -1,0 +1,98 @@
+# Taskfile.yaml - Automatización de tareas para grant-atlassian
+#
+# Requiere: https://taskfile.dev/installation/
+# Uso: task <nombre-de-tarea>
+
+version: "3"
+
+tasks:
+  # Tarea por defecto: muestra ayuda
+  default:
+    desc: Muestra las tareas disponibles
+    cmds:
+      - task --list
+    silent: true
+
+  # Ejecuta todos los tests unitarios
+  test:
+    desc: Ejecuta tests unitarios del handler y otros paquetes
+    cmds:
+      - go test ./... -v
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+
+  # Ejecuta tests con coverage
+  test:coverage:
+    desc: Ejecuta tests con reporte de cobertura
+    cmds:
+      - go test ./... -coverprofile=coverage.out
+      - go tool cover -func=coverage.out
+
+  # Build para Linux AMD64
+  build:linux:
+    desc: Compila el binario para Linux AMD64 en bin/grant-atlassian
+    cmds:
+      - mkdir -p bin
+      - GOOS=linux GOARCH=amd64 go build -o bin/grant-atlassian ./cmd
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - bin/grant-atlassian
+
+  # Build local (sistema actual)
+  build:
+    desc: Compila el binario para el sistema actual
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/grant-atlassian ./cmd
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - bin/grant-atlassian
+
+  # Limpia archivos generados
+  clean:
+    desc: Elimina binarios y archivos de cobertura
+    cmds:
+      - rm -rf bin/
+      - rm -f coverage.out
+
+  # Ejecuta linter (requiere golangci-lint)
+  lint:
+    desc: Ejecuta golangci-lint para verificar calidad de código
+    cmds:
+      - golangci-lint run ./...
+
+  # Formatea el código
+  fmt:
+    desc: Formatea el código fuente con gofmt
+    cmds:
+      - gofmt -w .
+
+  # Descarga dependencias
+  deps:
+    desc: Descarga y verifica dependencias
+    cmds:
+      - go mod download
+      - go mod verify
+
+  # Actualiza dependencias
+  deps:update:
+    desc: Actualiza dependencias a sus últimas versiones
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  # Instala el binario localmente (en $GOPATH/bin)
+  install:
+    desc: Instala el binario en $GOPATH/bin
+    deps:
+      - build
+    cmds:
+      - go install ./cmd
