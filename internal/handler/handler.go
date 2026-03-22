@@ -9,9 +9,9 @@ import (
 	"context"
 	"fmt"
 
-	grantprovider "github.com/KaribuLab/grant-provider"
 	"github.com/KaribuLab/grant-atlassian/internal/atlassian"
 	"github.com/KaribuLab/grant-atlassian/internal/provider"
+	grantprovider "github.com/KaribuLab/grant-provider"
 )
 
 const (
@@ -57,7 +57,16 @@ const (
 // comandos OAuth2 de Atlassian. Mantiene una referencia al servicio de
 // Atlassian que contiene la lógica de negocio.
 type AtlassianHandler struct {
-	service *atlassian.Service
+	service                  *atlassian.Service
+	clientCredentialsService grantprovider.GetClientCredentialsService
+}
+
+func (a *AtlassianHandler) GetCredentialsService() grantprovider.GetClientCredentialsService {
+	return a.clientCredentialsService
+}
+
+func (a *AtlassianHandler) SetCredentialsService(clientCredentialsService grantprovider.GetClientCredentialsService) {
+	a.clientCredentialsService = clientCredentialsService
 }
 
 // NewAtlassianHandler crea un nuevo handler con el servicio de Atlassian inyectado.
@@ -94,14 +103,21 @@ func NewAtlassianHandlerWithDefaults() *AtlassianHandler {
 //   - grantprovider.InvokeResponse: respuesta exitosa o error.
 //   - error: error si ocurre un problema inesperado (no de validación).
 func (h *AtlassianHandler) Invoke(cmd grantprovider.InvokeCommand) (grantprovider.InvokeResponse, error) {
+
+	clientCredentials, err := h.clientCredentialsService.Execute()
+
+	if err != nil {
+		return grantprovider.InvokeResponse{}, err
+	}
+
 	// Convertir arguments a mapa para fácil acceso
 	args := argumentsToMap(cmd.Arguments)
 
 	switch cmd.Command {
 	case CommandGetURL:
-		return h.handleGetURL(args)
+		return h.handleGetURL(args, clientCredentials)
 	case CommandGetToken:
-		return h.handleGetToken(args)
+		return h.handleGetToken(args, clientCredentials)
 	default:
 		return grantprovider.InvokeResponse{
 			Result: grantprovider.Result{
@@ -124,7 +140,7 @@ type GetURLData struct {
 }
 
 // handleGetURL procesa el comando get-url para generar la URL de autorización.
-func (h *AtlassianHandler) handleGetURL(args map[string]string) (grantprovider.InvokeResponse, error) {
+func (h *AtlassianHandler) handleGetURL(args map[string]string, clientCredentials grantprovider.ClientCredentialsData) (grantprovider.InvokeResponse, error) {
 	// Validar argumentos requeridos usando grant-provider
 	validationErr, err := grantprovider.ValidateOAuth2GetURL(argumentsFromMap(args))
 	if err != nil {
@@ -151,9 +167,9 @@ func (h *AtlassianHandler) handleGetURL(args map[string]string) (grantprovider.I
 		}, nil
 	}
 
-	// Construir parámetros de autorización
+	// Construir parámetros de autorización usando las credenciales resueltas
 	params := atlassian.AuthorizationParams{
-		ClientID:            args[ArgClientID],
+		ClientID:            clientCredentials.ClientID,
 		RedirectURI:         args[ArgRedirectURI],
 		Scope:               args[ArgScope],
 		State:               args[ArgState],
@@ -185,7 +201,7 @@ func (h *AtlassianHandler) handleGetURL(args map[string]string) (grantprovider.I
 }
 
 // handleGetToken procesa el comando get-token para intercambiar código por token.
-func (h *AtlassianHandler) handleGetToken(args map[string]string) (grantprovider.InvokeResponse, error) {
+func (h *AtlassianHandler) handleGetToken(args map[string]string, clientCredentials grantprovider.ClientCredentialsData) (grantprovider.InvokeResponse, error) {
 	// Validar argumentos requeridos usando grant-provider
 	validationErr, err := grantprovider.ValidateOAuth2GetToken(argumentsFromMap(args))
 	if err != nil {
@@ -212,11 +228,11 @@ func (h *AtlassianHandler) handleGetToken(args map[string]string) (grantprovider
 		}, nil
 	}
 
-	// Preparar request de token
+	// Preparar request de token usando las credenciales resueltas
 	req := atlassian.TokenRequest{
 		Code:         args[ArgCode],
-		ClientID:     args[ArgClientID],
-		ClientSecret: args[ArgClientSecret],
+		ClientID:     clientCredentials.ClientID,
+		ClientSecret: clientCredentials.ClientSecret,
 		RedirectURI:  args[ArgRedirectURI],
 		CodeVerifier: args[ArgCodeVerifier],
 	}

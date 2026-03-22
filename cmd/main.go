@@ -6,8 +6,9 @@
 // y escribe la respuesta como JSON a os.Stdout.
 //
 // Uso:
-//   echo '{"command":"get-url","provider":"atlassian","session_id":"s1","arguments":[...]}' | grant-atlassian oauth2 get-url
-//   echo '{"command":"get-token","provider":"atlassian","session_id":"s1","arguments":[...]}' | grant-atlassian oauth2 get-token
+//
+//	echo '{"command":"get-url","provider":"atlassian","session_id":"s1","arguments":[...]}' | grant-atlassian oauth2 get-url
+//	echo '{"command":"get-token","provider":"atlassian","session_id":"s1","arguments":[...]}' | grant-atlassian oauth2 get-token
 package main
 
 import (
@@ -16,8 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	grantprovider "github.com/KaribuLab/grant-provider"
 	"github.com/KaribuLab/grant-atlassian/internal/handler"
+	grantprovider "github.com/KaribuLab/grant-provider"
 )
 
 const (
@@ -37,6 +38,14 @@ func main() {
 		os.Exit(ExitCodeError)
 	}
 	os.Exit(ExitCodeSuccess)
+}
+
+func NewExchangeFetcher(command grantprovider.InvokeCommand) grantprovider.ExchangeFetcher {
+	return &grantprovider.ExchangeFetcherService{
+		Provider:         command.Provider,
+		SessionID:        command.SessionID,
+		ExchangeEndpoint: command.ExchangeEndpoint,
+	}
 }
 
 // execute configura el handler y los comandos OAuth2, y ejecuta el CLI.
@@ -118,7 +127,7 @@ Ejemplo de entrada JSON:
 }`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Crear invocador con el handler
-			invoker := grantprovider.NewCommandInvoker(h)
+			invoker := grantprovider.NewOAuth2CommandInvoker(h, NewExchangeFetcher)
 
 			// Leer comando desde stdin y ejecutar
 			resp, err := invoker.Run(os.Stdin)

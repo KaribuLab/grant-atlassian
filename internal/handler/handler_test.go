@@ -18,13 +18,61 @@ import (
 	"github.com/KaribuLab/grant-atlassian/internal/provider"
 )
 
+// mockExchangeFetcher implementa grantprovider.ExchangeFetcher para tests.
+// Permite inyectar credenciales predefinidas sin llamadas HTTP reales.
+type mockExchangeFetcher struct {
+	// ClientID es el client_id que se retornará en Execute.
+	ClientID string
+	// ClientSecret es el client_secret que se retornará en Execute.
+	ClientSecret string
+	// Error es el error opcional que se retornará en Execute.
+	Error error
+}
+
+// Execute implementa ExchangeFetcher retornando las credenciales configuradas.
+func (m *mockExchangeFetcher) Execute(req grantprovider.ExchangeRequest) (grantprovider.ExchangeReponse, error) {
+	if m.Error != nil {
+		return grantprovider.ExchangeReponse{}, m.Error
+	}
+	return grantprovider.ExchangeReponse{
+		Message: "ok",
+		Data: map[string]interface{}{
+			"client_id":     m.ClientID,
+			"client_secret": m.ClientSecret,
+		},
+	}, nil
+}
+
+// newTestHandler crea un AtlassianHandler con un mockExchangeFetcher inyectado
+// para ser usado en tests unitarios.
+//
+// Parámetros:
+//   - svc: servicio Atlassian con cliente HTTP mockeado.
+//   - clientID: client_id simulado que retornará el fetcher.
+//   - clientSecret: client_secret simulado que retornará el fetcher.
+//
+// Retorna:
+//   - *handler.AtlassianHandler: handler configurado para tests.
+func newTestHandler(svc *atlassian.Service, clientID, clientSecret string) *handler.AtlassianHandler {
+	h := handler.NewAtlassianHandler(svc)
+	fetcher := &mockExchangeFetcher{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+	}
+	h.SetCredentialsService(grantprovider.GetClientCredentialsService{
+		ExchangeFetcher: fetcher,
+		OTT:             "test-ott",
+	})
+	return h
+}
+
 // TestAtlassianHandler_Invoke_UnknownCommand verifica que comandos
 // desconocidos retornan error apropiado.
 func TestAtlassianHandler_Invoke_UnknownCommand(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   "unknown-command",
@@ -57,7 +105,7 @@ func TestAtlassianHandler_Invoke_GetURL_Success(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetURL,
@@ -125,7 +173,7 @@ func TestAtlassianHandler_Invoke_GetURL_WithPKCE(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetURL,
@@ -175,7 +223,7 @@ func TestAtlassianHandler_Invoke_GetURL_MissingRequiredArgs(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	// Probar sin scope y state (argumentos requeridos según grant-provider)
 	cmd := grantprovider.InvokeCommand{
@@ -219,7 +267,7 @@ func TestAtlassianHandler_Invoke_GetToken_Success(t *testing.T) {
 	}`)
 
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetToken,
@@ -309,7 +357,7 @@ func TestAtlassianHandler_Invoke_GetToken_WithPKCE(t *testing.T) {
 	}`)
 
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetToken,
@@ -365,7 +413,7 @@ func TestAtlassianHandler_Invoke_GetToken_WithClientSecret(t *testing.T) {
 	}`)
 
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "super-secret")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetToken,
@@ -415,7 +463,7 @@ func TestAtlassianHandler_Invoke_GetToken_MissingCode(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	// Probar sin código (requerido)
 	cmd := grantprovider.InvokeCommand{
@@ -454,7 +502,7 @@ func TestAtlassianHandler_Invoke_GetToken_APIError(t *testing.T) {
 	}`)
 
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetToken,
@@ -490,7 +538,7 @@ func TestAtlassianHandler_Invoke_GetToken_NetworkError(t *testing.T) {
 	mockClient.Error = http.ErrHandlerTimeout
 
 	svc := atlassian.NewService(mockClient)
-	h := handler.NewAtlassianHandler(svc)
+	h := newTestHandler(svc, "test-client-id", "")
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetToken,
