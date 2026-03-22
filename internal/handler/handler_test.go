@@ -72,7 +72,7 @@ func TestAtlassianHandler_Invoke_UnknownCommand(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := newTestHandler(svc, "test-client-id", "")
+	h := handler.NewAtlassianHandler(svc)
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   "unknown-command",
@@ -100,12 +100,13 @@ func TestAtlassianHandler_Invoke_UnknownCommand(t *testing.T) {
 }
 
 // TestAtlassianHandler_Invoke_GetURL_Success verifica generación exitosa
-// de URL de autorización.
+// de URL de autorización. get-url no requiere el mock de credenciales porque
+// usa client_id directamente de los argumentos del comando.
 func TestAtlassianHandler_Invoke_GetURL_Success(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := newTestHandler(svc, "test-client-id", "")
+	h := handler.NewAtlassianHandler(svc)
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetURL,
@@ -173,7 +174,7 @@ func TestAtlassianHandler_Invoke_GetURL_WithPKCE(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := newTestHandler(svc, "test-client-id", "")
+	h := handler.NewAtlassianHandler(svc)
 
 	cmd := grantprovider.InvokeCommand{
 		Command:   handler.CommandGetURL,
@@ -223,7 +224,7 @@ func TestAtlassianHandler_Invoke_GetURL_MissingRequiredArgs(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()
 	svc := atlassian.NewService(mockClient)
-	h := newTestHandler(svc, "test-client-id", "")
+	h := handler.NewAtlassianHandler(svc)
 
 	// Probar sin scope y state (argumentos requeridos según grant-provider)
 	cmd := grantprovider.InvokeCommand{
@@ -458,7 +459,8 @@ func TestAtlassianHandler_Invoke_GetToken_WithClientSecret(t *testing.T) {
 }
 
 // TestAtlassianHandler_Invoke_GetToken_MissingCode verifica que falta
-// el código produce error de validación.
+// el código produce error de validación. Usa mock de credenciales porque
+// get-token las requiere antes de validar argumentos.
 func TestAtlassianHandler_Invoke_GetToken_MissingCode(t *testing.T) {
 	// Setup
 	mockClient := provider.NewMockHTTPClient()

@@ -96,6 +96,11 @@ func NewAtlassianHandlerWithDefaults() *AtlassianHandler {
 // Invoke procesa un comando invocado y retorna la respuesta apropiada.
 // Implementa la interfaz grantprovider.CommandHandler.
 //
+// Para get-url, el client_id se obtiene directamente de los argumentos del
+// comando (es un identificador público). Para get-token, las credenciales
+// (client_id y client_secret) se obtienen del servidor vía exchange de OTT,
+// a través del clientCredentialsService inyectado por OAuth2CommandInvoker.
+//
 // Parámetros:
 //   - cmd: comando a ejecutar con sus argumentos.
 //
@@ -103,20 +108,19 @@ func NewAtlassianHandlerWithDefaults() *AtlassianHandler {
 //   - grantprovider.InvokeResponse: respuesta exitosa o error.
 //   - error: error si ocurre un problema inesperado (no de validación).
 func (h *AtlassianHandler) Invoke(cmd grantprovider.InvokeCommand) (grantprovider.InvokeResponse, error) {
-
-	clientCredentials, err := h.clientCredentialsService.Execute()
-
-	if err != nil {
-		return grantprovider.InvokeResponse{}, err
-	}
-
 	// Convertir arguments a mapa para fácil acceso
 	args := argumentsToMap(cmd.Arguments)
 
 	switch cmd.Command {
 	case CommandGetURL:
-		return h.handleGetURL(args, clientCredentials)
+		// get-url usa client_id de los argumentos (identificador público).
+		return h.handleGetURL(args)
 	case CommandGetToken:
+		// get-token obtiene credenciales del servidor via exchange seguro de OTT.
+		clientCredentials, err := h.clientCredentialsService.Execute()
+		if err != nil {
+			return grantprovider.InvokeResponse{}, err
+		}
 		return h.handleGetToken(args, clientCredentials)
 	default:
 		return grantprovider.InvokeResponse{
@@ -140,7 +144,9 @@ type GetURLData struct {
 }
 
 // handleGetURL procesa el comando get-url para generar la URL de autorización.
-func (h *AtlassianHandler) handleGetURL(args map[string]string, clientCredentials grantprovider.ClientCredentialsData) (grantprovider.InvokeResponse, error) {
+// El client_id se toma directamente de los argumentos del comando, ya que es un
+// identificador público y no requiere intercambio seguro de credenciales.
+func (h *AtlassianHandler) handleGetURL(args map[string]string) (grantprovider.InvokeResponse, error) {
 	// Validar argumentos requeridos usando grant-provider
 	validationErr, err := grantprovider.ValidateOAuth2GetURL(argumentsFromMap(args))
 	if err != nil {
@@ -167,9 +173,9 @@ func (h *AtlassianHandler) handleGetURL(args map[string]string, clientCredential
 		}, nil
 	}
 
-	// Construir parámetros de autorización usando las credenciales resueltas
+	// Construir parámetros de autorización: client_id es público y viene de los argumentos.
 	params := atlassian.AuthorizationParams{
-		ClientID:            clientCredentials.ClientID,
+		ClientID:            args[ArgClientID],
 		RedirectURI:         args[ArgRedirectURI],
 		Scope:               args[ArgScope],
 		State:               args[ArgState],
