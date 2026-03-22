@@ -115,26 +115,34 @@ Este CLI funciona como **invocador por stdin**: recibe un `InvokeCommand` en for
 
 ### Formato de entrada
 
+Todos los comandos requieren los campos `ott` (one-time token) y `exchange_endpoint` para que el servidor orquestador pueda inyectar las credenciales OAuth2 de forma segura.
+
 ```json
 {
   "command": "nombre-del-comando",
   "provider": "atlassian",
   "session_id": "id-de-sesion",
+  "ott": "ONE_TIME_TOKEN",
+  "exchange_endpoint": "http://localhost:1215/exchange",
   "arguments": [
     {"name": "nombre-arg", "value": "valor-arg"}
   ]
 }
 ```
 
+> **Nota sobre `ott` y `exchange_endpoint`**: Estos campos son utilizados por el orquestador de grant-provider para gestionar las credenciales OAuth2 de forma segura. En el flujo `get-token`, el CLI usa el OTT para obtener el `client_id` y `client_secret` del servidor (sin exponerlos en los argumentos). En el flujo `get-url`, se validan pero no se usan para credenciales.
+
 ### Comando get-url
 
-Genera la URL de autorización OAuth2:
+Genera la URL de autorización OAuth2. El `client_id` se incluye explícitamente en los argumentos porque es un identificador público:
 
 ```bash
 echo '{
   "command": "get-url",
   "provider": "atlassian",
   "session_id": "session-001",
+  "ott": "ONE_TIME_TOKEN",
+  "exchange_endpoint": "http://localhost:1215/exchange",
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
@@ -162,13 +170,15 @@ Salida JSON:
 
 ### Comando get-url con PKCE
 
-Para aplicaciones públicas:
+Para aplicaciones públicas que no pueden mantener un `client_secret`:
 
 ```bash
 echo '{
   "command": "get-url",
   "provider": "atlassian",
   "session_id": "session-001",
+  "ott": "ONE_TIME_TOKEN",
+  "exchange_endpoint": "http://localhost:1215/exchange",
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
@@ -183,32 +193,33 @@ echo '{
 
 ### Comando get-token
 
-Intercambia el código de autorización por tokens:
+Intercambia el código de autorización por tokens. Las credenciales (`client_id` y `client_secret`) **no se pasan como argumentos**: el CLI las obtiene de forma segura del servidor usando el `ott` y `exchange_endpoint`:
 
 ```bash
-# Para aplicaciones confidenciales (con client_secret)
+# Con PKCE (para apps públicas)
 echo '{
   "command": "get-token",
   "provider": "atlassian",
   "session_id": "session-001",
+  "ott": "ONE_TIME_TOKEN",
+  "exchange_endpoint": "http://localhost:1215/exchange",
   "arguments": [
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
-    {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "client_secret", "value": "TU_CLIENT_SECRET"},
-    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"}
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
+    {"name": "code_verifier", "value": "TU_CODE_VERIFIER_ORIGINAL"}
   ]
 }' | grant-atlassian get-token
 
-# Para aplicaciones públicas (con PKCE)
+# Sin PKCE (para apps confidenciales, client_secret viene del servidor via OTT)
 echo '{
   "command": "get-token",
   "provider": "atlassian",
   "session_id": "session-001",
+  "ott": "ONE_TIME_TOKEN",
+  "exchange_endpoint": "http://localhost:1215/exchange",
   "arguments": [
     {"name": "code", "value": "CODIGO_RECIBIDO_EN_CALLBACK"},
-    {"name": "client_id", "value": "TU_CLIENT_ID"},
-    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
-    {"name": "code_verifier", "value": "TU_CODE_VERIFIER_ORIGINAL"}
+    {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"}
   ]
 }' | grant-atlassian get-token
 ```
@@ -240,18 +251,22 @@ Salida JSON:
 CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=+/')
 CODE_CHALLENGE=$(echo -n "$CODE_VERIFIER" | openssl dgst -sha256 -binary | openssl base64 | tr -d '=+/')
 
+SESSION_ID="session-$(date +%s)"
+
 # Crear JSON de entrada
 INPUT_JSON=$(cat <<EOF
 {
   "command": "get-url",
   "provider": "atlassian",
-  "session_id": "session-$(date +%s)",
+  "session_id": "$SESSION_ID",
+  "ott": "$OTT",
+  "exchange_endpoint": "$EXCHANGE_ENDPOINT",
   "arguments": [
     {"name": "response_type", "value": "code"},
     {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "scope", "value": "read:jira-work read:jira-user offline_access"},
-    {"name": "state", "value": "state-$(date +%s)"},
+    {"name": "state", "value": "$SESSION_ID"},
     {"name": "code_challenge", "value": "$CODE_CHALLENGE"},
     {"name": "code_challenge_method", "value": "S256"}
   ]
@@ -268,10 +283,12 @@ echo "$INPUT_JSON" | grant-atlassian get-url
 Extrae la `authorization_url` de la respuesta JSON y redirige al usuario. Después de autorizar, Atlassian redirige a:
 
 ```
-http://localhost:1215/callback/atlassian?code=AUTH_CODE&state=state-...
+http://localhost:1215/callback/atlassian?code=AUTH_CODE&state=session-...
 ```
 
 ### 3. Intercambiar código por token
+
+El `client_id` y `client_secret` los resuelve el servidor via OTT; solo se necesita el código y el `code_verifier` (si se usó PKCE):
 
 ```bash
 # Crear JSON de entrada
@@ -279,10 +296,11 @@ INPUT_JSON=$(cat <<EOF
 {
   "command": "get-token",
   "provider": "atlassian",
-  "session_id": "session-001",
+  "session_id": "$SESSION_ID",
+  "ott": "$OTT",
+  "exchange_endpoint": "$EXCHANGE_ENDPOINT",
   "arguments": [
     {"name": "code", "value": "AUTH_CODE_RECIBIDO"},
-    {"name": "client_id", "value": "TU_CLIENT_ID"},
     {"name": "redirect_uri", "value": "http://localhost:1215/callback/atlassian"},
     {"name": "code_verifier", "value": "$CODE_VERIFIER"}
   ]
@@ -296,10 +314,20 @@ echo "$INPUT_JSON" | grant-atlassian get-token
 
 ## Argumentos
 
-### get-url
+### Campos del InvokeCommand (siempre requeridos)
+
+| Campo | Descripción |
+|-------|-------------|
+| `command` | Nombre del comando: `get-url` o `get-token` |
+| `provider` | Siempre `"atlassian"` |
+| `session_id` | Identificador de la sesión OAuth2 |
+| `ott` | One-time token proporcionado por el servidor orquestador |
+| `exchange_endpoint` | URL del endpoint de exchange del servidor orquestador |
+
+### Argumentos de get-url
 
 | Argumento | Requerido | Descripción |
-|-----------|------------|-------------|
+|-----------|-----------|-------------|
 | `response_type` | Sí | Siempre `"code"` para flujo de autorización |
 | `client_id` | Sí | Client ID de tu aplicación OAuth2 en Atlassian |
 | `redirect_uri` | Sí | URI de redirección registrada en la consola de desarrolladores |
@@ -308,14 +336,14 @@ echo "$INPUT_JSON" | grant-atlassian get-token
 | `code_challenge` | No | Hash del code_verifier para flujo PKCE |
 | `code_challenge_method` | No | Método del challenge: `S256` o `plain`. Por defecto: `S256` |
 
-### get-token
+### Argumentos de get-token
+
+Las credenciales OAuth2 (`client_id`, `client_secret`) son resueltas automáticamente por el servidor via OTT. Solo se necesita:
 
 | Argumento | Requerido | Descripción |
-|-----------|------------|-------------|
+|-----------|-----------|-------------|
 | `code` | Sí | Código de autorización recibido en el callback |
-| `client_id` | Sí | Client ID de tu aplicación |
-| `redirect_uri` | Sí | Debe coincidir con el usado en get-url |
-| `client_secret` | No | Requerido para apps confidenciales |
+| `redirect_uri` | No | Debe coincidir con el usado en get-url (requerido por Atlassian) |
 | `code_verifier` | No | Requerido si se usó PKCE en get-url |
 
 ## Scopes disponibles
